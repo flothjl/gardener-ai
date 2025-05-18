@@ -1,18 +1,20 @@
 from growkit_core.api import (
     AddBedParams,
-    AddPlantParams,
+    AddPlantingParams,
+    AddTaskParams,
     CreateGardenParams,
     MoveBedParams,
     RemoveBedParams,
-    RemovePlantParams,
+    RemovePlantingParams,
     UpdateBedDimensionsParams,
     UpdateGardenMetadataParams,
     add_bed,
-    add_plant,
+    add_planting,
+    add_task,
     create_garden,
     move_bed,
     remove_bed,
-    remove_plant,
+    remove_planting,
     update_bed_dimensions,
     update_garden_metadata,
 )
@@ -50,19 +52,26 @@ def test_add_bed_to_garden():
     assert bed.soil_type == "sandy"
 
 
-def test_add_plant_to_bed():
-    garden = create_garden(CreateGardenParams(name="Plant Test Garden"))
+def test_add_planting_to_bed():
+    garden = create_garden(CreateGardenParams(name="Planting Test Garden"))
     bed_params = AddBedParams(name="Bed X", width=1.0, length=1.0)
     garden = add_bed(garden, bed_params)
     bed_id = garden.beds[0].id
 
-    plant_params = AddPlantParams(bed_id=bed_id, species="Lettuce", variety="Romaine")
-    garden = add_plant(garden, plant_params)
+    planting_params = AddPlantingParams(
+        bed_id=bed_id,
+        species="Lettuce",
+        variety="Romaine",
+        position=(0.2, 0.3),
+        spacing=0.15,
+    )
+    garden = add_planting(garden, planting_params)
 
     bed = garden.beds[0]
-    assert len(bed.plants) == 1
-    assert bed.plants[0].species == "Lettuce"
-    assert bed.plants[0].variety == "Romaine"
+    assert len(bed.plantings) == 1
+    assert bed.plantings[0].species == "Lettuce"
+    assert bed.plantings[0].variety == "Romaine"
+    assert bed.plantings[0].position == (0.2, 0.3)
 
 
 def test_move_bed():
@@ -81,16 +90,24 @@ def test_remove_bed():
     assert all(b.id != bed.id for b in garden.beds)
 
 
-def test_remove_plant():
-    garden = create_garden(CreateGardenParams(name="Remove Plant Garden"))
+def test_remove_planting():
+    garden = create_garden(CreateGardenParams(name="Remove Planting Garden"))
     bed = add_bed(garden, AddBedParams(name="Bed", width=1.0, length=1.0)).beds[0]
     bed_id = bed.id
-    garden = add_plant(garden, AddPlantParams(bed_id=bed_id, species="Kale"))
-    garden = add_plant(garden, AddPlantParams(bed_id=bed_id, species="Beet"))
 
-    garden = remove_plant(garden, RemovePlantParams(bed_id=bed_id, plant_index=0))
-    assert garden.beds[0].plants[0].species == "Beet"
-    assert len(garden.beds[0].plants) == 1
+    garden = add_planting(
+        garden, AddPlantingParams(bed_id=bed_id, species="Kale", position=(0.1, 0.1))
+    )
+    garden = add_planting(
+        garden, AddPlantingParams(bed_id=bed_id, species="Beet", position=(0.2, 0.2))
+    )
+
+    # Remove the first planting
+    garden = remove_planting(
+        garden, RemovePlantingParams(bed_id=bed_id, planting_index=0)
+    )
+    assert garden.beds[0].plantings[0].species == "Beet"
+    assert len(garden.beds[0].plantings) == 1
 
 
 def test_update_bed_dimensions():
@@ -117,3 +134,20 @@ def test_update_garden_metadata():
     )
     assert garden.name == "New Name"
     assert garden.location and garden.location.latitude == 42.0
+
+
+def test_add_garden_task():
+    from datetime import date
+
+    garden = create_garden(CreateGardenParams(name="Test Tasks"))
+    garden = add_task(
+        garden,
+        AddTaskParams(
+            title="Mulch All Beds",
+            target_date=date(2025, 5, 20),
+            description="Apply mulch to conserve water.",
+        ),
+    )
+    assert len(garden.tasks) == 1
+    assert garden.tasks[0].title == "Mulch All Beds"
+    assert garden.tasks[0].related_planting_id is None
