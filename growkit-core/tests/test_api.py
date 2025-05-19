@@ -1,3 +1,5 @@
+import pytest
+
 from growkit_core.api import (
     AddBedParams,
     AddPlantingParams,
@@ -19,6 +21,7 @@ from growkit_core.api import (
     update_garden_metadata,
 )
 from growkit_core.models import Coordinates, UnitLength
+from growkit_core.validators import GardenValidationException, validate_garden
 
 
 def test_create_garden_with_coords():
@@ -43,7 +46,6 @@ def test_add_bed_to_garden():
         soil_type="sandy",
     )
     garden = add_bed(garden, params)
-
     assert len(garden.beds) == 1
     bed = garden.beds[0]
     assert bed.name == "Bed A"
@@ -66,12 +68,70 @@ def test_add_planting_to_bed():
         spacing=0.15,
     )
     garden = add_planting(garden, planting_params)
-
     bed = garden.beds[0]
     assert len(bed.plantings) == 1
     assert bed.plantings[0].species == "Lettuce"
     assert bed.plantings[0].variety == "Romaine"
     assert bed.plantings[0].position == (0.2, 0.3)
+
+
+def test_add_planting_spacing_conflict_raises():
+    garden = create_garden(CreateGardenParams(name="Conflict Garden"))
+    garden = add_bed(garden, AddBedParams(name="Bed Y", width=1.0, length=1.0))
+    bed_id = garden.beds[0].id
+
+    # Add the first planting
+    garden = add_planting(
+        garden,
+        AddPlantingParams(
+            bed_id=bed_id,
+            species="Radish",
+            position=(0.1, 0.1),
+            spacing=0.2,
+        ),
+    )
+    # Add the conflicting planting - should raise exception
+    with pytest.raises(GardenValidationException):
+        add_planting(
+            garden,
+            AddPlantingParams(
+                bed_id=bed_id,
+                species="Carrot",
+                position=(0.15, 0.15),
+                spacing=0.2,
+            ),
+        )
+
+
+def test_add_planting_spacing_conflict_manual_validation():
+    # This test shows how to bypass validation and check manually
+    garden = create_garden(CreateGardenParams(name="Conflict Garden"))
+    garden = add_bed(garden, AddBedParams(name="Bed Y", width=1.0, length=1.0))
+    bed_id = garden.beds[0].id
+
+    # Add both plantings with validation off
+    garden = add_planting(
+        garden,
+        AddPlantingParams(
+            bed_id=bed_id,
+            species="Radish",
+            position=(0.1, 0.1),
+            spacing=0.2,
+        ),
+        validate=False,
+    )
+    garden = add_planting(
+        garden,
+        AddPlantingParams(
+            bed_id=bed_id,
+            species="Carrot",
+            position=(0.15, 0.15),
+            spacing=0.2,
+        ),
+        validate=False,
+    )
+    issues = validate_garden(garden)
+    assert any(issue.type == "spacing_conflict" for issue in issues)
 
 
 def test_move_bed():

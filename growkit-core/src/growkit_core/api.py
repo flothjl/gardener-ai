@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated, Optional, Tuple
 from uuid import uuid4
 
@@ -14,6 +14,7 @@ from growkit_core.models import (
     TaskStatus,
     UnitLength,
 )
+from growkit_core.validators import GardenValidationException, validate_garden
 
 NonEmptyStr = Annotated[str, Field(min_length=1)]
 NonZeroPositiveFloat = Annotated[float, Field(gt=0)]
@@ -48,7 +49,9 @@ class UpdateBedDimensionsParams(BaseModel):
     unit: UnitLength = UnitLength.meters
 
 
-def update_bed_dimensions(garden: Garden, params: UpdateBedDimensionsParams) -> Garden:
+def update_bed_dimensions(
+    garden: Garden, params: UpdateBedDimensionsParams, validate: bool = True
+) -> Garden:
     for bed in garden.beds:
         if bed.id == params.bed_id:
             bed.dimensions = Dimensions(
@@ -57,6 +60,10 @@ def update_bed_dimensions(garden: Garden, params: UpdateBedDimensionsParams) -> 
                 depth=params.depth,
                 unit=params.unit,
             )
+            if validate:
+                issues = validate_garden(garden)
+                if issues:
+                    raise GardenValidationException(issues)
             return garden
     raise ValueError(f"No bed found with id '{params.bed_id}'")
 
@@ -66,11 +73,18 @@ class RemovePlantingParams(BaseModel):
     planting_index: int  # You may want to allow removing by ID in the future
 
 
-def remove_planting(garden: Garden, params: RemovePlantingParams) -> Garden:
+def remove_planting(
+    garden: Garden, params: RemovePlantingParams, validate: bool = True
+) -> Garden:
     for bed in garden.beds:
         if bed.id == params.bed_id:
             if 0 <= params.planting_index < len(bed.plantings):
+                # Remove the planting
                 del bed.plantings[params.planting_index]
+                if validate:
+                    issues = validate_garden(garden)
+                    if issues:
+                        raise GardenValidationException(issues)
                 return garden
             raise IndexError("Invalid planting index")
     raise ValueError(f"No bed found with id '{params.bed_id}'")
@@ -80,8 +94,14 @@ class RemoveBedParams(BaseModel):
     bed_id: str
 
 
-def remove_bed(garden: Garden, params: RemoveBedParams) -> Garden:
+def remove_bed(
+    garden: Garden, params: RemoveBedParams, validate: bool = True
+) -> Garden:
     garden.beds = [bed for bed in garden.beds if bed.id != params.bed_id]
+    if validate:
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
     return garden
 
 
@@ -90,10 +110,14 @@ class MoveBedParams(BaseModel):
     new_position: Tuple[float, float]
 
 
-def move_bed(garden: Garden, params: MoveBedParams) -> Garden:
+def move_bed(garden: Garden, params: MoveBedParams, validate: bool = True) -> Garden:
     for bed in garden.beds:
         if bed.id == params.bed_id:
             bed.position = params.new_position
+            if validate:
+                issues = validate_garden(garden)
+                if issues:
+                    raise GardenValidationException(issues)
             return garden
     raise ValueError(f"No bed found with id '{params.bed_id}'")
 
@@ -108,7 +132,7 @@ class AddBedParams(BaseModel):
     soil_type: Optional[NonEmptyStr] = None
 
 
-def add_bed(garden: Garden, params: AddBedParams) -> Garden:
+def add_bed(garden: Garden, params: AddBedParams, validate: bool = True) -> Garden:
     new_bed = Bed(
         id=str(uuid4()),
         name=params.name,
@@ -122,6 +146,10 @@ def add_bed(garden: Garden, params: AddBedParams) -> Garden:
         soil_type=params.soil_type,
         plantings=[],
     )
+    if validate:
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
     garden.beds.append(new_bed)
     return garden
 
@@ -140,7 +168,9 @@ class AddPlantingParams(BaseModel):
     notes: Optional[NonEmptyStr] = None
 
 
-def add_planting(garden: Garden, params: AddPlantingParams) -> Garden:
+def add_planting(
+    garden: Garden, params: AddPlantingParams, validate: bool = True
+) -> Garden:
     """
     Adds a planting to the specified bed. If spacing is not provided,
     it is looked up from the crop definition if available.
@@ -162,6 +192,10 @@ def add_planting(garden: Garden, params: AddPlantingParams) -> Garden:
                 notes=params.notes,
             )
             bed.plantings.append(new_planting)
+            if validate:
+                issues = validate_garden(garden)
+                if issues:
+                    raise GardenValidationException(issues)
 
             return garden
 
