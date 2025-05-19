@@ -1,0 +1,21 @@
+[project]
+name = "growkit-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [{ name = "Josh Floth", email = "flothjldev@proton.me" }]
+requires-python = ">=3.13"
+
+dependencies = [
+  "growkit-core @ git+https://github.com/flothjl/gardener-ai.git#subdirectory=growkit-core",
+  "mcp[cli]>=1.8.1",
+]
+[project.scripts]
+growkit-mcp = "growkit_mcp:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
