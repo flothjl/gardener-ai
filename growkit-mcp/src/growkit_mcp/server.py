@@ -1,6 +1,9 @@
+from typing import List, Tuple
+
 from growkit_core.api import (
     AddBedParams,
     AddPlantingParams,
+    AddTaskParams,
     CreateGardenParams,
     MoveBedParams,
     RemoveBedParams,
@@ -9,6 +12,7 @@ from growkit_core.api import (
     UpdateGardenMetadataParams,
     add_bed,
     add_planting,
+    add_task,
     create_garden,
     move_bed,
     remove_bed,
@@ -17,10 +21,11 @@ from growkit_core.api import (
     update_garden_metadata,
 )
 from growkit_core.models import Garden
-from growkit_core.validators import GardenValidationException
+from growkit_core.validators import GardenValidationException, validate_garden
 from mcp.server.fastmcp import FastMCP
 from mcp.shared.exceptions import McpError
 from mcp.types import INVALID_REQUEST, ErrorData
+from pydantic import BaseModel
 
 INSTRUCTIONS = """
 You are a garden planning assistant. You help users construct and modify digital garden plans.
@@ -32,34 +37,22 @@ mcp = FastMCP("Growkit Garden Agent", INSTRUCTIONS)
 
 
 def _validation_error(e: GardenValidationException):
-    # Return all error messages as a single string or list as you see fit
     return McpError(
         ErrorData(
             message="\n".join([issue.message for issue in e.issues]),
             code=INVALID_REQUEST,
+            data=[issue.dict() for issue in e.issues],  # Optional: full detail
         )
     )
 
 
 @mcp.tool("CreateGarden")
 def mcp_create_garden(params: CreateGardenParams) -> Garden:
-    """
-    Creates a new garden with the given name. Optionally, provide latitude and longitude to geolocate the garden.
-    If coordinates are not provided, the garden will be treated as an abstract or simulated space.
-    """
-    return create_garden(
-        CreateGardenParams(
-            name=params.name, latitude=params.latitude, longitude=params.longitude
-        )
-    )
+    return create_garden(params)
 
 
 @mcp.tool("AddBed")
 def mcp_add_bed(garden: Garden, params: AddBedParams) -> Garden:
-    """
-    Adds a new bed to the specified garden.
-    Validates that bed name is not empty and dimensions are positive.
-    """
     if not params.name.strip():
         raise McpError(
             ErrorData(message="Bed name must not be empty.", code=INVALID_REQUEST)
@@ -79,12 +72,6 @@ def mcp_add_bed(garden: Garden, params: AddBedParams) -> Garden:
 
 @mcp.tool("AddPlanting")
 def mcp_add_planting(garden: Garden, params: AddPlantingParams) -> Garden:
-    """
-    Adds a planting to a specified bed in the garden.
-    Requires the `bed_id` of the target bed and the plant's species name.
-    Variety, notes, and planting/harvest dates can be included optionally.
-    Validates that the specified bed exists and species name is provided.
-    """
     if not params.species.strip():
         raise McpError(
             ErrorData(
@@ -105,13 +92,13 @@ def mcp_add_planting(garden: Garden, params: AddPlantingParams) -> Garden:
         raise _validation_error(e)
 
 
+@mcp.tool("AddTask")
+def mcp_add_task(garden: Garden, params: AddTaskParams) -> Garden:
+    return add_task(garden, params)
+
+
 @mcp.tool("MoveBed")
 def mcp_move_bed(garden: Garden, params: MoveBedParams) -> Garden:
-    """
-    Moves a bed to a new (x, y) position relative to the garden origin.
-    Requires the `bed_id` and the new position as a tuple of floats.
-    Validates that the bed exists.
-    """
     if not any(b.id == params.bed_id for b in garden.beds):
         raise McpError(
             ErrorData(
@@ -127,10 +114,6 @@ def mcp_move_bed(garden: Garden, params: MoveBedParams) -> Garden:
 
 @mcp.tool("RemoveBed")
 def mcp_remove_bed(garden: Garden, params: RemoveBedParams) -> Garden:
-    """
-    Removes a bed from the garden by its `bed_id`.
-    If no bed is found, raises an error.
-    """
     if not any(b.id == params.bed_id for b in garden.beds):
         raise McpError(
             ErrorData(
@@ -146,11 +129,6 @@ def mcp_remove_bed(garden: Garden, params: RemoveBedParams) -> Garden:
 
 @mcp.tool("RemovePlanting")
 def mcp_remove_planting(garden: Garden, params: RemovePlantingParams) -> Garden:
-    """
-    Removes a planting from the given bed by its index in the planting list.
-    Requires both `bed_id` and the planting's index in that bed's planting list.
-    Validates that both the bed and index exist.
-    """
     bed = next((b for b in garden.beds if b.id == params.bed_id), None)
     if not bed:
         raise McpError(
@@ -176,10 +154,6 @@ def mcp_remove_planting(garden: Garden, params: RemovePlantingParams) -> Garden:
 def mcp_update_bed_dimensions(
     garden: Garden, params: UpdateBedDimensionsParams
 ) -> Garden:
-    """
-    Updates the dimensions (width, length, depth, unit) of a specified bed.
-    Ensures the bed exists and that width/length are positive values.
-    """
     if params.width <= 0 or params.length <= 0:
         raise McpError(
             ErrorData(
@@ -204,10 +178,6 @@ def mcp_update_bed_dimensions(
 def mcp_update_garden_metadata(
     garden: Garden, params: UpdateGardenMetadataParams
 ) -> Garden:
-    """
-    Updates garden-level metadata such as name or geolocation.
-    All fields are optional. If no changes are provided, the garden is returned unchanged.
-    """
     if not params.name and not params.location:
         raise McpError(
             ErrorData(
@@ -216,6 +186,137 @@ def mcp_update_garden_metadata(
             )
         )
     return update_garden_metadata(garden, params)
+
+
+class AddBedsParams(BaseModel):
+    beds: List[AddBedParams]
+
+
+@mcp.tool("AddBeds")
+def mcp_add_beds(garden: Garden, params: AddBedsParams) -> Garden:
+    """
+    Adds multiple beds to the garden. All beds are validated at once.
+    If any addition fails, the operation halts and errors are returned.
+    """
+    try:
+        for bed_params in params.beds:
+            garden = add_bed(garden, bed_params, validate=False)
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
+        return garden
+    except GardenValidationException as e:
+        raise _validation_error(e)
+    except ValueError as e:
+        raise McpError(ErrorData(message=str(e), code=INVALID_REQUEST))
+
+
+class AddPlantingsParams(BaseModel):
+    plantings: List[AddPlantingParams]
+
+
+@mcp.tool("BulkAddPlantings")
+def mcp_add_plantings(garden: Garden, params: AddPlantingsParams) -> Garden:
+    """
+    Adds multiple plantings to the garden (possibly different beds).
+    Validates all at once. If any error occurs, no partial success is promised.
+    """
+    try:
+        for planting_params in params.plantings:
+            garden = add_planting(garden, planting_params, validate=False)
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
+        return garden
+    except GardenValidationException as e:
+        raise _validation_error(e)
+    except ValueError as e:
+        raise McpError(ErrorData(message=str(e), code=INVALID_REQUEST))
+
+
+@mcp.tool("ValidateGarden")
+def mcp_validate_garden(garden: Garden):
+    """
+    Validates the current garden state. Returns a list of validation issues, if any.
+    """
+    issues = validate_garden(garden)
+    return [issue.model_dump() for issue in issues]
+
+
+class RemovePlantingsParams(BaseModel):
+    removals: List[Tuple[str, int]]  # List of (bed_id, planting_index)
+
+
+@mcp.tool("RemovePlantings")
+def mcp_remove_plantings(garden: Garden, params: RemovePlantingsParams) -> Garden:
+    try:
+        # Remove in reverse index order for each bed, so indices don't shift
+        sorted_removals = sorted(params.removals, key=lambda x: (x[0], -x[1]))
+        for bed_id, idx in sorted_removals:
+            garden = remove_planting(
+                garden,
+                RemovePlantingParams(bed_id=bed_id, planting_index=idx),
+                validate=False,
+            )
+        # Final validation
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
+        return garden
+    except GardenValidationException as e:
+        raise _validation_error(e)
+    except ValueError as e:
+        # Bed or index error from core API
+        raise McpError(
+            ErrorData(
+                message=str(e),
+                code=INVALID_REQUEST,
+            )
+        )
+
+
+class RemoveBedsParams(BaseModel):
+    bed_ids: List[str]
+
+
+@mcp.tool("RemoveBeds")
+def mcp_remove_beds(garden: Garden, params: RemoveBedsParams) -> Garden:
+    """
+    Removes multiple beds from the garden by ID. Validates at the end.
+    """
+    try:
+        for bed_id in params.bed_ids:
+            garden = remove_bed(garden, RemoveBedParams(bed_id=bed_id), validate=False)
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
+        return garden
+    except GardenValidationException as e:
+        raise _validation_error(e)
+    except ValueError as e:
+        raise McpError(ErrorData(message=str(e), code=INVALID_REQUEST))
+
+
+class AddTasksParams(BaseModel):
+    tasks: List[AddTaskParams]
+
+
+@mcp.tool("AddTasks")
+def mcp_add_tasks(garden: Garden, params: AddTasksParams) -> Garden:
+    """
+    Adds multiple tasks to the garden at once. Validates at the end.
+    """
+    try:
+        for task_params in params.tasks:
+            garden = add_task(garden, task_params)
+        issues = validate_garden(garden)
+        if issues:
+            raise GardenValidationException(issues)
+        return garden
+    except GardenValidationException as e:
+        raise _validation_error(e)
+    except ValueError as e:
+        raise McpError(ErrorData(message=str(e), code=INVALID_REQUEST))
 
 
 @mcp.resource(
