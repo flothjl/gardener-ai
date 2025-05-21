@@ -20,7 +20,7 @@ from growkit_core.api import (
     update_bed_dimensions,
     update_garden_metadata,
 )
-from growkit_core.models import Garden
+from growkit_core.models import Garden, GardenTask
 from growkit_core.validators import GardenValidationException, validate_garden
 from mcp.server.fastmcp import FastMCP
 from mcp.shared.exceptions import McpError
@@ -320,8 +320,16 @@ def mcp_add_tasks(garden: Garden, params: AddTasksParams) -> Garden:
 
 
 @mcp.resource(
-    uri="json://schema",
-    description="get json schema for the gardener-ai platform.",
+    uri="json://garden-schema",
+    description="get json schema for gardens.",
 )
-def get_json_schema():
+def get_json_schema_garden():
     return Garden.model_json_schema()
+
+
+@mcp.resource(
+    uri="json://task-schema",
+    description="get json schema for tasks.",
+)
+def get_json_schema_tasks():
+    return GardenTask.model_json_schema()
