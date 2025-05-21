@@ -325,11 +325,3 @@ def mcp_add_tasks(garden: Garden, params: AddTasksParams) -> Garden:
 )
 def get_json_schema_garden():
     return Garden.model_json_schema()
-
-
-@mcp.resource(
-    uri="json://task-schema",
-    description="get json schema for tasks.",
-)
-def get_json_schema_tasks():
-    return GardenTask.model_json_schema()
