@@ -1,0 +1,1540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Garden Visualizer</title>
+    <style>
+      :root {
+        --primary-color: #4caf50;
+        --secondary-color: #81c784;
+        --accent-color: #388e3c;
+        --text-color: #333;
+        --background-color: #f9fbf9;
+        --border-color: #ccc;
+        --task-pending: #ffc107;
+        --task-completed: #4caf50;
+        --task-skipped: #9e9e9e;
+        --bed-fill: #8bc34a;
+        --bed-stroke: #558b2f;
+        --bed-selected-stroke: #ff5722;
+        --bed-hover: #9ccc65;
+        --soil-area: rgba(121, 85, 72, 0.2);
+        --bed-label-background: rgba(255, 255, 255, 0.85);
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--background-color);
+        color: var(--text-color);
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding-top: 20px;
+      }
+
+      h1 {
+        color: var(--primary-color);
+        margin-bottom: 15px;
+        font-size: 2.5rem;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+      }
+
+      .garden-icon {
+        font-size: 2.2rem;
+        vertical-align: middle;
+        display: inline-block;
+        margin-right: 5px;
+      }
+
+      header p {
+        color: #666;
+        font-size: 1.1rem;
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.5;
+      }
+
+      .file-input-container {
+        text-align: center;
+        padding: 30px 20px;
+        border: 2px dashed #81c784;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        background-color: rgb(245, 250, 245);
+        transition: all 0.3s;
+      }
+
+      .file-input-container:hover {
+        background-color: rgb(240, 248, 240);
+        border-color: #4caf50;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+
+      .file-input-container p {
+        margin-top: 12px;
+        color: #666;
+        font-size: 14px;
+      }
+
+      .garden-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 30px;
+        margin-top: 20px;
+      }
+
+      .garden-info {
+        flex: 1;
+        min-width: 300px;
+      }
+
+      .garden-view {
+        flex: 2;
+        min-width: 500px;
+        position: relative;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background-color: #f5f8f5;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      .garden-canvas {
+        width: 100%;
+        height: 500px;
+      }
+
+      .info-panel {
+        background-color: white;
+        border-radius: 10px;
+        padding: 18px 20px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+        margin-bottom: 25px;
+        transition: all 0.2s;
+      }
+
+      .info-panel:hover {
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .info-panel h3 {
+        color: var(--primary-color);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+        padding-bottom: 12px;
+        margin-top: 0;
+        font-weight: 600;
+        font-size: 17px;
+      }
+
+      .beds-list,
+      .tasks-list {
+        list-style-type: none;
+        padding: 0;
+        margin-top: 15px;
+      }
+
+      .bed-item,
+      .task-item {
+        padding: 12px 15px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-color: #f9f9f9;
+        border-left: 3px solid transparent;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      .bed-item:hover {
+        background-color: #f0f0f0;
+        transform: translateX(2px);
+        border-left-color: #81c784;
+      }
+
+      .bed-item.selected {
+        background-color: rgba(76, 175, 80, 0.1);
+        border-left-color: #4caf50;
+        font-weight: 500;
+      }
+
+      .task-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .task-item:hover {
+        background-color: #f0f0f0;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .task-item .status {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        margin-right: 8px;
+        flex-shrink: 0;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .task-item.pending .status {
+        background-color: var(--task-pending);
+      }
+
+      .task-item.completed .status {
+        background-color: var(--task-completed);
+      }
+
+      .task-item.skipped .status {
+        background-color: var(--task-skipped);
+      }
+
+      .task-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+
+      .task-date {
+        font-size: 0.85em;
+        color: #777;
+        margin-top: 3px;
+      }
+
+      .task-overdue .task-date {
+        color: #e53935;
+        font-weight: 500;
+      }
+
+      .btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 50px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        transition: all 0.2s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn:hover {
+        background-color: var(--accent-color);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .planting-info {
+        display: none;
+        position: absolute;
+        background-color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        z-index: 100;
+        max-width: 280px;
+        font-size: 14px;
+        line-height: 1.5;
+        animation: fadeIn 0.2s ease-out;
+      }
+
+      .planting-info h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: var(--primary-color);
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+        font-size: 16px;
+      }
+
+      .planting-info p {
+        margin: 5px 0;
+      }
+
+      .planting-info strong {
+        color: #555;
+        font-weight: 600;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .tooltip {
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 6px;
+        padding: 6px 12px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        z-index: 1000;
+        font-size: 14px;
+        font-weight: 500;
+        color: #444;
+        display: none;
+        transform: translateY(-5px);
+        animation: tooltipFadeIn 0.15s ease-out;
+        border-left: 3px solid var(--primary-color);
+      }
+
+      @keyframes tooltipFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(0);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(-5px);
+        }
+      }
+
+      /* Plant legend styles */
+      .plants-legend {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .legend-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--primary-color);
+        font-size: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+      }
+
+      .legend-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        padding: 5px 10px;
+        background-color: #f9f9f9;
+        border-radius: 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s;
+      }
+
+      .legend-item:hover {
+        background-color: #f0f0f0;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        margin-right: 8px;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1><span class="garden-icon">🌱</span> Garden Visualizer</h1>
+        <p>
+          Upload your garden JSON file to create a beautiful visualization of
+          your garden layout and tasks
+        </p>
+      </header>
+
+      <div class="file-input-container">
+        <input
+          type="file"
+          id="gardenFile"
+          accept=".json"
+          style="display: none"
+        />
+        <button class="btn" id="uploadBtn">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Upload Garden JSON File
+        </button>
+        <p id="fileName"></p>
+      </div>
+
+      <div class="garden-container" id="gardenContainer" style="display: none">
+        <div class="garden-info">
+          <div class="info-panel">
+            <h3>Garden Information</h3>
+            <div id="gardenInfo">
+              <p><strong>Name:</strong> <span id="gardenName"></span></p>
+              <p><strong>Created:</strong> <span id="gardenCreated"></span></p>
+              <p>
+                <strong>Location:</strong> <span id="gardenLocation"></span>
+              </p>
+              <p><strong>Last Frost:</strong> <span id="lastFrost"></span></p>
+              <p><strong>First Frost:</strong> <span id="firstFrost"></span></p>
+            </div>
+          </div>
+
+          <div class="info-panel">
+            <h3>Garden Beds</h3>
+            <ul class="beds-list" id="bedsList"></ul>
+          </div>
+
+          <div class="plants-legend" id="plantsLegend">
+            <div class="legend-title">Plants Legend</div>
+            <div class="legend-items" id="legendItems"></div>
+          </div>
+        </div>
+
+        <div class="garden-view">
+          <canvas id="gardenCanvas" class="garden-canvas"></canvas>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <div class="garden-info">
+          <div class="info-panel">
+            <h3>Tasks</h3>
+            <ul class="tasks-list" id="tasksList"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Planting info popup -->
+    <div class="planting-info" id="plantingInfo"></div>
+
+    <script>
+      // Global variables
+      let gardenData = null;
+      let canvas = document.getElementById("gardenCanvas");
+      let ctx = canvas.getContext("2d");
+      let scale = 1;
+      let offsetX = 20;
+      let offsetY = 20;
+      let selectedBed = null;
+      let speciesColors = {};
+      let colorIndex = 0;
+      let colors = [
+        "#4CAF50",
+        "#2196F3",
+        "#FFC107",
+        "#FF5722",
+        "#9C27B0",
+        "#3F51B5",
+        "#009688",
+        "#795548",
+        "#607D8B",
+        "#E91E63",
+        "#8BC34A",
+        "#00BCD4",
+        "#FFEB3B",
+        "#FF9800",
+        "#673AB7",
+      ];
+
+      // Event Listeners
+      document.getElementById("uploadBtn").addEventListener("click", () => {
+        document.getElementById("gardenFile").click();
+      });
+
+      document
+        .getElementById("gardenFile")
+        .addEventListener("change", handleFileSelect);
+
+      canvas.addEventListener("mousemove", handleCanvasMouseMove);
+      canvas.addEventListener("click", handleCanvasClick);
+
+      // Functions
+      function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            gardenData = JSON.parse(e.target.result);
+            document.getElementById("fileName").textContent = file.name;
+            document.getElementById("gardenContainer").style.display = "flex";
+            displayGarden();
+          } catch (error) {
+            alert("Error parsing JSON file: " + error.message);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      function displayGarden() {
+        // Reset
+        speciesColors = {};
+        colorIndex = 0;
+
+        // Set canvas size
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+
+        // Display garden info
+        document.getElementById("gardenName").textContent =
+          gardenData.name || "Unnamed Garden";
+
+        const createdDate = gardenData.created_at
+          ? new Date(gardenData.created_at).toLocaleDateString()
+          : "Unknown";
+        document.getElementById("gardenCreated").textContent = createdDate;
+
+        if (gardenData.location) {
+          document.getElementById("gardenLocation").textContent =
+            `${gardenData.location.latitude.toFixed(4)}, ${gardenData.location.longitude.toFixed(4)}`;
+        } else {
+          document.getElementById("gardenLocation").textContent =
+            "No location data";
+        }
+
+        document.getElementById("lastFrost").textContent =
+          gardenData.average_last_frost || "Not specified";
+        document.getElementById("firstFrost").textContent =
+          gardenData.average_first_frost || "Not specified";
+
+        // Display beds list
+        const bedsList = document.getElementById("bedsList");
+        bedsList.innerHTML = "";
+        if (gardenData.beds && gardenData.beds.length > 0) {
+          gardenData.beds.forEach((bed) => {
+            const li = document.createElement("li");
+            li.className = "bed-item";
+            li.dataset.bedId = bed.id;
+            li.textContent = bed.name;
+            li.addEventListener("click", () => {
+              selectBed(bed.id);
+            });
+            bedsList.appendChild(li);
+          });
+        } else {
+          bedsList.innerHTML = "<li>No beds in this garden</li>";
+        }
+
+        // Display tasks
+        displayTasks();
+
+        // Draw garden
+        drawGarden();
+
+        // Create plant legend
+        updatePlantsLegend();
+      }
+
+      function resizeCanvas() {
+        const container = canvas.parentElement;
+        canvas.width = container.clientWidth;
+        canvas.height = 500;
+        if (gardenData) {
+          drawGarden();
+        }
+      }
+
+      function drawGarden() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!gardenData || !gardenData.beds || gardenData.beds.length === 0) {
+          drawEmptyGarden();
+          return;
+        }
+
+        // Calculate the bounds of all beds
+        const bounds = calculateBounds();
+
+        // Calculate scale to fit all beds
+        calculateScale(bounds);
+
+        // Draw grid
+        drawGrid();
+
+        // Draw beds
+        gardenData.beds.forEach((bed) => {
+          drawBed(bed);
+        });
+      }
+
+      function calculateBounds() {
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+
+        gardenData.beds.forEach((bed) => {
+          const pos = bed.position || [0, 0];
+          const x = pos[0];
+          const y = pos[1];
+          const width = bed.dimensions.width;
+          const length = bed.dimensions.length;
+
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + width);
+          maxY = Math.max(maxY, y + length);
+        });
+
+        // Add some padding
+        minX -= 1;
+        minY -= 1;
+        maxX += 1;
+        maxY += 1;
+
+        return { minX, minY, maxX, maxY };
+      }
+
+      function calculateScale(bounds) {
+        const width = bounds.maxX - bounds.minX;
+        const height = bounds.maxY - bounds.minY;
+
+        const scaleX = (canvas.width - offsetX * 2) / width;
+        const scaleY = (canvas.height - offsetY * 2) / height;
+
+        scale = Math.min(scaleX, scaleY);
+
+        // Adjust offset to center the garden
+        offsetX = (canvas.width - width * scale) / 2;
+        offsetY = (canvas.height - height * scale) / 2;
+      }
+
+      function drawGrid() {
+        ctx.strokeStyle = "#ddd";
+        ctx.lineWidth = 0.5;
+
+        // Draw grid
+        const gridSize = 1; // 1 meter or foot grid
+        const bounds = calculateBounds();
+
+        for (
+          let x = Math.floor(bounds.minX);
+          x <= Math.ceil(bounds.maxX);
+          x += gridSize
+        ) {
+          ctx.beginPath();
+          ctx.moveTo(transformX(x), transformY(bounds.minY));
+          ctx.lineTo(transformX(x), transformY(bounds.maxY));
+          ctx.stroke();
+        }
+
+        for (
+          let y = Math.floor(bounds.minY);
+          y <= Math.ceil(bounds.maxY);
+          y += gridSize
+        ) {
+          ctx.beginPath();
+          ctx.moveTo(transformX(bounds.minX), transformY(y));
+          ctx.lineTo(transformX(bounds.maxX), transformY(y));
+          ctx.stroke();
+        }
+      }
+
+      function drawBed(bed) {
+        const pos = bed.position || [0, 0];
+        const x = pos[0];
+        const y = pos[1];
+        const width = bed.dimensions.width;
+        const length = bed.dimensions.length;
+
+        const isSelected = bed.id === selectedBed;
+        const bedX = transformX(x);
+        const bedY = transformY(y);
+        const bedWidth = width * scale;
+        const bedHeight = length * scale;
+
+        // Draw bed background with soil texture
+        if (bed.soil_type) {
+          ctx.fillStyle = "rgba(121, 85, 72, 0.2)";
+          ctx.fillRect(bedX, bedY, bedWidth, bedHeight);
+        }
+
+        // Shape for raised bed - rounded corners and gradient fill
+        ctx.beginPath();
+        const cornerRadius = Math.min(bedWidth, bedHeight) * 0.1;
+        ctx.moveTo(bedX + cornerRadius, bedY);
+        ctx.lineTo(bedX + bedWidth - cornerRadius, bedY);
+        ctx.arcTo(
+          bedX + bedWidth,
+          bedY,
+          bedX + bedWidth,
+          bedY + cornerRadius,
+          cornerRadius,
+        );
+        ctx.lineTo(bedX + bedWidth, bedY + bedHeight - cornerRadius);
+        ctx.arcTo(
+          bedX + bedWidth,
+          bedY + bedHeight,
+          bedX + bedWidth - cornerRadius,
+          bedY + bedHeight,
+          cornerRadius,
+        );
+        ctx.lineTo(bedX + cornerRadius, bedY + bedHeight);
+        ctx.arcTo(
+          bedX,
+          bedY + bedHeight,
+          bedX,
+          bedY + bedHeight - cornerRadius,
+          cornerRadius,
+        );
+        ctx.lineTo(bedX, bedY + cornerRadius);
+        ctx.arcTo(bedX, bedY, bedX + cornerRadius, bedY, cornerRadius);
+        ctx.closePath();
+
+        // Create gradient fill for raised bed appearance
+        const gradient = ctx.createLinearGradient(
+          bedX,
+          bedY,
+          bedX,
+          bedY + bedHeight,
+        );
+        gradient.addColorStop(0, "#9CCC65"); // Lighter green at top
+        gradient.addColorStop(1, "#7CB342"); // Darker green at bottom
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Add 3D-like effect with a subtle inner shadow
+        ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
+
+        // Draw border with selection highlight
+        ctx.lineWidth = isSelected ? 4 : 2;
+        ctx.strokeStyle = isSelected ? "#FF5722" : "#558B2F";
+        ctx.stroke();
+
+        // Reset shadow
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Draw bed name label with background for better visibility
+        const labelText = bed.name;
+        ctx.font = "bold 14px Arial";
+        const textWidth = ctx.measureText(labelText).width;
+
+        // Draw label background
+        const labelPadding = 6;
+        const labelX = transformX(x + width / 2) - textWidth / 2 - labelPadding;
+        const labelY = transformY(y) - 25;
+        const labelHeight = 20;
+
+        ctx.fillStyle = isSelected
+          ? "rgba(255, 87, 34, 0.85)"
+          : "rgba(255, 255, 255, 0.85)";
+        ctx.beginPath();
+        ctx.roundRect(
+          labelX,
+          labelY,
+          textWidth + labelPadding * 2,
+          labelHeight,
+          4,
+        );
+        ctx.fill();
+
+        // Draw text
+        ctx.fillStyle = isSelected ? "white" : "#333";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          labelText,
+          transformX(x + width / 2),
+          labelY + labelHeight / 2,
+        );
+
+        // Draw soil type if available
+        if (bed.soil_type) {
+          const soilText = `Soil: ${bed.soil_type}`;
+          const soilWidth = ctx.measureText(soilText).width;
+
+          ctx.font = "12px Arial";
+          ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+          ctx.beginPath();
+          ctx.roundRect(
+            transformX(x + width / 2) - soilWidth / 2 - labelPadding,
+            transformY(y + length) + 5,
+            soilWidth + labelPadding * 2,
+            18,
+            4,
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "#333";
+          ctx.fillText(
+            soilText,
+            transformX(x + width / 2),
+            transformY(y + length) + 14,
+          );
+        }
+
+        // Draw plantings
+        if (bed.plantings && bed.plantings.length > 0) {
+          bed.plantings.forEach((planting) => {
+            drawPlanting(planting, bed);
+          });
+        }
+      }
+
+      function drawPlanting(planting, bed) {
+        const bedPos = bed.position || [0, 0];
+        const plantingPos = planting.position;
+
+        // Calculate absolute position
+        const x = bedPos[0] + plantingPos[0];
+        const y = bedPos[1] + plantingPos[1];
+
+        // Get color for species or create new one
+        if (!speciesColors[planting.species]) {
+          speciesColors[planting.species] = colors[colorIndex % colors.length];
+          colorIndex++;
+        }
+
+        const baseColor = speciesColors[planting.species];
+        const plantSize = planting.spacing
+          ? Math.min(planting.spacing, 0.5) * scale
+          : 0.3 * scale;
+        const centerX = transformX(x);
+        const centerY = transformY(y);
+
+        // Save context
+        ctx.save();
+
+        // Create plant shadow
+        ctx.beginPath();
+        ctx.arc(centerX, centerY + 2, plantSize * 0.9, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+        ctx.fill();
+
+        // Create plant gradient - lighter at top
+        const plantGradient = ctx.createRadialGradient(
+          centerX - plantSize / 3,
+          centerY - plantSize / 3,
+          plantSize / 5,
+          centerX,
+          centerY,
+          plantSize,
+        );
+
+        // Parse the base color to create lighter/darker variants
+        const baseRgb = hexToRgb(baseColor);
+        const lightColor = `rgb(${Math.min(baseRgb.r + 40, 255)}, ${Math.min(baseRgb.g + 40, 255)}, ${Math.min(baseRgb.b + 40, 255)})`;
+        const darkColor = `rgb(${Math.max(baseRgb.r - 30, 0)}, ${Math.max(baseRgb.g - 30, 0)}, ${Math.max(baseRgb.b - 30, 0)})`;
+
+        plantGradient.addColorStop(0, lightColor);
+        plantGradient.addColorStop(0.7, baseColor);
+        plantGradient.addColorStop(1, darkColor);
+
+        // Draw main plant circle
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, plantSize, 0, Math.PI * 2);
+        ctx.fillStyle = plantGradient;
+        ctx.fill();
+
+        // Add highlights
+        ctx.beginPath();
+        ctx.arc(
+          centerX - plantSize / 3,
+          centerY - plantSize / 3,
+          plantSize / 3,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.fill();
+
+        // Add detail based on plant type
+        // This is a simplistic approach - in a real app, you might want to use different shapes for different plants
+        if (planting.species.toLowerCase().includes("tomato")) {
+          // Tomatoes - add small circles to represent fruit
+          const fruitCount = 3;
+          const fruitSize = plantSize / 6;
+          ctx.fillStyle = "#FF6D6D"; // Reddish for tomatoes
+
+          for (let i = 0; i < fruitCount; i++) {
+            const angle = ((Math.PI * 2) / fruitCount) * i;
+            const fruitX = centerX + Math.cos(angle) * (plantSize * 0.7);
+            const fruitY = centerY + Math.sin(angle) * (plantSize * 0.7);
+
+            ctx.beginPath();
+            ctx.arc(fruitX, fruitY, fruitSize, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (
+          planting.species.toLowerCase().includes("lettuce") ||
+          planting.species.toLowerCase().includes("cabbage")
+        ) {
+          // Lettuce - add wavy lines to represent leaves
+          ctx.strokeStyle = darkColor;
+          ctx.lineWidth = 1;
+
+          const waveCount = 6;
+          for (let i = 0; i < waveCount; i++) {
+            const angle = ((Math.PI * 2) / waveCount) * i;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+
+            // Create wavy line outward
+            const endX = centerX + Math.cos(angle) * plantSize;
+            const endY = centerY + Math.sin(angle) * plantSize;
+
+            const ctrl1X = centerX + Math.cos(angle + 0.2) * (plantSize * 0.5);
+            const ctrl1Y = centerY + Math.sin(angle + 0.2) * (plantSize * 0.5);
+
+            ctx.quadraticCurveTo(ctrl1X, ctrl1Y, endX, endY);
+            ctx.stroke();
+          }
+        } else if (
+          planting.species.toLowerCase().includes("herb") ||
+          planting.species.toLowerCase().includes("basil") ||
+          planting.species.toLowerCase().includes("rosemary") ||
+          planting.species.toLowerCase().includes("cilantro")
+        ) {
+          // Herbs - add spiky leaves
+          ctx.fillStyle = darkColor;
+
+          const leafCount = 7;
+          for (let i = 0; i < leafCount; i++) {
+            const angle = ((Math.PI * 2) / leafCount) * i;
+
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+              centerX + Math.cos(angle - 0.2) * (plantSize * 1.1),
+              centerY + Math.sin(angle - 0.2) * (plantSize * 1.1),
+            );
+            ctx.lineTo(
+              centerX + Math.cos(angle) * (plantSize * 1.3),
+              centerY + Math.sin(angle) * (plantSize * 1.3),
+            );
+            ctx.lineTo(
+              centerX + Math.cos(angle + 0.2) * (plantSize * 1.1),
+              centerY + Math.sin(angle + 0.2) * (plantSize * 1.1),
+            );
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        // Add a subtle outline
+        ctx.lineWidth = plantSize * 0.1;
+        ctx.strokeStyle = darkColor;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, plantSize, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Restore context
+        ctx.restore();
+
+        // Store planting data for tooltip/interaction
+        planting._renderData = {
+          x: centerX,
+          y: centerY,
+          radius: plantSize,
+          bedId: bed.id,
+        };
+      }
+
+      // Helper function to convert hex color to RGB
+      function hexToRgb(hex) {
+        // Remove # if present
+        hex = hex.replace("#", "");
+
+        // Parse the hex values
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        return { r, g, b };
+      }
+
+      function drawEmptyGarden() {
+        ctx.fillStyle = "#666";
+        ctx.font = "18px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          "No garden beds to display",
+          canvas.width / 2,
+          canvas.height / 2,
+        );
+      }
+
+      function transformX(x) {
+        return x * scale + offsetX;
+      }
+
+      function transformY(y) {
+        return y * scale + offsetY;
+      }
+
+      function selectBed(bedId) {
+        selectedBed = bedId === selectedBed ? null : bedId;
+
+        // Update bed item highlighting
+        document.querySelectorAll(".bed-item").forEach((item) => {
+          if (item.dataset.bedId === selectedBed) {
+            item.classList.add("selected");
+          } else {
+            item.classList.remove("selected");
+          }
+        });
+
+        // Highlight related tasks
+        document.querySelectorAll(".task-item").forEach((item) => {
+          if (selectedBed && item.dataset.bedId === selectedBed) {
+            item.classList.add("selected");
+          } else {
+            item.classList.remove("selected");
+          }
+        });
+
+        drawGarden();
+      }
+
+      function displayTasks() {
+        const tasksList = document.getElementById("tasksList");
+        tasksList.innerHTML = "";
+
+        if (gardenData.tasks && gardenData.tasks.length > 0) {
+          // Sort tasks by date
+          const tasks = [...gardenData.tasks].sort((a, b) => {
+            return new Date(a.target_date) - new Date(b.target_date);
+          });
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          tasks.forEach((task) => {
+            const li = document.createElement("li");
+            li.className = `task-item ${task.status || "pending"}`;
+
+            // Check if task is overdue
+            const taskDate = new Date(task.target_date);
+            taskDate.setHours(0, 0, 0, 0);
+            if (
+              taskDate < today &&
+              task.status !== "completed" &&
+              task.status !== "skipped"
+            ) {
+              li.classList.add("task-overdue");
+            }
+
+            li.dataset.taskId = task.id;
+            if (task.related_bed_id) {
+              li.dataset.bedId = task.related_bed_id;
+            }
+
+            const statusSpan = document.createElement("span");
+            statusSpan.className = "status";
+            li.appendChild(statusSpan);
+
+            const contentDiv = document.createElement("div");
+            contentDiv.className = "task-content";
+
+            const titleSpan = document.createElement("div");
+            titleSpan.className = "task-title";
+            titleSpan.textContent = task.title;
+            contentDiv.appendChild(titleSpan);
+
+            const dateSpan = document.createElement("div");
+            dateSpan.className = "task-date";
+
+            // Format the date more nicely
+            const dateObj = new Date(task.target_date);
+            const formattedDate = dateObj.toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            });
+
+            dateSpan.textContent = formattedDate;
+            if (
+              taskDate < today &&
+              task.status !== "completed" &&
+              task.status !== "skipped"
+            ) {
+              dateSpan.textContent += " (Overdue)";
+            }
+
+            contentDiv.appendChild(dateSpan);
+
+            li.appendChild(contentDiv);
+
+            // Add click event to show details
+            li.addEventListener("click", () => {
+              showTaskDetails(task);
+            });
+
+            tasksList.appendChild(li);
+          });
+        } else {
+          tasksList.innerHTML =
+            '<li class="task-item">No tasks for this garden</li>';
+        }
+      }
+
+      function showTaskDetails(task) {
+        // Instead of alert, create a modal
+        let modalHtml = `
+                <div id="taskModal" class="task-modal">
+                    <div class="task-modal-content">
+                        <span class="close-modal">&times;</span>
+                        <h3>${task.title}</h3>
+                        <div class="task-status-badge ${task.status || "pending"}">${task.status || "Pending"}</div>
+                        <p class="task-modal-date"><strong>Due:</strong> ${new Date(
+                          task.target_date,
+                        ).toLocaleDateString("en-US", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}</p>
+                        ${task.description ? `<div class="task-description"><strong>Description:</strong> ${task.description}</div>` : ""}
+                        ${task.completed_on ? `<p><strong>Completed on:</strong> ${new Date(task.completed_on).toLocaleDateString()}</p>` : ""}
+                        ${task.related_bed_id ? `<p><strong>Related to bed:</strong> ${getBedName(task.related_bed_id)}</p>` : ""}
+                    </div>
+                </div>
+            `;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById("taskModal");
+        if (existingModal) {
+          existingModal.remove();
+        }
+
+        // Add modal to body
+        document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+        // Add styles if not already added
+        if (!document.getElementById("modal-styles")) {
+          const styleEl = document.createElement("style");
+          styleEl.id = "modal-styles";
+          styleEl.textContent = `
+                    .task-modal {
+                        display: block;
+                        position: fixed;
+                        z-index: 1000;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: rgba(0,0,0,0.4);
+                        animation: fadeIn 0.3s;
+                    }
+                    
+                    .task-modal-content {
+                        background-color: white;
+                        margin: 10% auto;
+                        padding: 25px;
+                        border-radius: 12px;
+                        width: 80%;
+                        max-width: 500px;
+                        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                        position: relative;
+                        animation: slideDown 0.3s;
+                    }
+                    
+                    @keyframes slideDown {
+                        from { transform: translateY(-30px); opacity: 0; }
+                        to { transform: translateY(0); opacity: 1; }
+                    }
+                    
+                    .close-modal {
+                        position: absolute;
+                        top: 15px;
+                        right: 20px;
+                        color: #aaa;
+                        font-size: 28px;
+                        font-weight: bold;
+                        cursor: pointer;
+                    }
+                    
+                    .close-modal:hover {
+                        color: #333;
+                    }
+                    
+                    .task-status-badge {
+                        display: inline-block;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        text-transform: capitalize;
+                        margin-bottom: 15px;
+                    }
+                    
+                    .task-status-badge.pending {
+                        background-color: #FFF3E0;
+                        color: #FF9800;
+                    }
+                    
+                    .task-status-badge.completed {
+                        background-color: #E8F5E9;
+                        color: #4CAF50;
+                    }
+                    
+                    .task-status-badge.skipped {
+                        background-color: #ECEFF1;
+                        color: #607D8B;
+                    }
+                    
+                    .task-modal-date {
+                        margin-bottom: 15px;
+                        color: #555;
+                    }
+                    
+                    .task-description {
+                        background-color: #f9f9f9;
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-bottom: 15px;
+                        line-height: 1.6;
+                    }
+                `;
+          document.head.appendChild(styleEl);
+        }
+
+        // Add event listener for close button
+        const closeBtn = document.querySelector(".close-modal");
+        closeBtn.addEventListener("click", () => {
+          document.getElementById("taskModal").remove();
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener("click", (event) => {
+          const modal = document.getElementById("taskModal");
+          if (event.target === modal) {
+            modal.remove();
+          }
+        });
+
+        // If task is related to a bed, select that bed
+        if (task.related_bed_id) {
+          selectBed(task.related_bed_id);
+        }
+      }
+
+      function getBedName(bedId) {
+        if (!gardenData || !gardenData.beds) return "Unknown bed";
+
+        const bed = gardenData.beds.find((b) => b.id === bedId);
+        return bed ? bed.name : "Unknown bed";
+      }
+
+      function handleCanvasMouseMove(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        let hoveredPlanting = null;
+
+        // Check if mouse is over a planting
+        if (gardenData && gardenData.beds) {
+          for (const bed of gardenData.beds) {
+            if (bed.plantings) {
+              for (const planting of bed.plantings) {
+                if (planting._renderData) {
+                  const dx = x - planting._renderData.x;
+                  const dy = y - planting._renderData.y;
+                  const distance = Math.sqrt(dx * dx + dy * dy);
+
+                  if (distance <= planting._renderData.radius) {
+                    hoveredPlanting = planting;
+                    break;
+                  }
+                }
+              }
+            }
+            if (hoveredPlanting) break;
+          }
+        }
+
+        // Show tooltip
+        const tooltip = document.getElementById("tooltip");
+        if (hoveredPlanting) {
+          tooltip.style.display = "block";
+          tooltip.style.left = `${e.clientX}px`;
+          tooltip.style.top = `${e.clientY - 30}px`;
+
+          let tooltipText = hoveredPlanting.species;
+          if (hoveredPlanting.variety) {
+            tooltipText += ` (${hoveredPlanting.variety})`;
+          }
+
+          tooltip.textContent = tooltipText;
+          canvas.style.cursor = "pointer";
+        } else {
+          tooltip.style.display = "none";
+          canvas.style.cursor = "default";
+        }
+      }
+
+      function handleCanvasClick(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Check if clicked on a planting
+        if (gardenData && gardenData.beds) {
+          for (const bed of gardenData.beds) {
+            if (bed.plantings) {
+              for (const planting of bed.plantings) {
+                if (planting._renderData) {
+                  const dx = x - planting._renderData.x;
+                  const dy = y - planting._renderData.y;
+                  const distance = Math.sqrt(dx * dx + dy * dy);
+
+                  if (distance <= planting._renderData.radius) {
+                    showPlantingInfo(planting, e.clientX, e.clientY);
+                    return;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // If clicked elsewhere, hide planting info
+        document.getElementById("plantingInfo").style.display = "none";
+      }
+
+      function showPlantingInfo(planting, x, y) {
+        const infoPanel = document.getElementById("plantingInfo");
+        infoPanel.style.display = "block";
+        infoPanel.style.left = `${x + 10}px`;
+        infoPanel.style.top = `${y + 10}px`;
+
+        let html = `<h4>${planting.species}</h4>`;
+        if (planting.variety) {
+          html += `<p><strong>Variety:</strong> ${planting.variety}</p>`;
+        }
+        if (planting.planted_on) {
+          html += `<p><strong>Planted:</strong> ${new Date(planting.planted_on).toLocaleDateString()}</p>`;
+        }
+        if (planting.expected_harvest) {
+          html += `<p><strong>Expected harvest:</strong> ${new Date(planting.expected_harvest).toLocaleDateString()}</p>`;
+        }
+        if (planting.spacing) {
+          html += `<p><strong>Spacing:</strong> ${planting.spacing} ${gardenData.beds.find((b) => b.id === planting._renderData.bedId)?.dimensions.unit || "m"}</p>`;
+        }
+        if (planting.notes) {
+          html += `<p><strong>Notes:</strong> ${planting.notes}</p>`;
+        }
+
+        infoPanel.innerHTML = html;
+      }
+
+      function updatePlantsLegend() {
+        const legendItems = document.getElementById("legendItems");
+        legendItems.innerHTML = "";
+
+        // Create legend items for each plant species
+        for (const species in speciesColors) {
+          const item = document.createElement("div");
+          item.className = "legend-item";
+
+          const colorBox = document.createElement("div");
+          colorBox.className = "legend-color";
+          colorBox.style.backgroundColor = speciesColors[species];
+
+          const label = document.createElement("span");
+          label.textContent = species;
+
+          item.appendChild(colorBox);
+          item.appendChild(label);
+          legendItems.appendChild(item);
+        }
+
+        // Show/hide legend based on content
+        document.getElementById("plantsLegend").style.display =
+          Object.keys(speciesColors).length > 0 ? "block" : "none";
+      }
+
+      // Add example garden function for testing
+      function loadExampleGarden() {
+        const exampleGarden = {
+          name: "Example Garden",
+          id: "garden1",
+          created_at: "2023-04-15T10:30:00Z",
+          location: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+          },
+          average_last_frost: "2023-03-15",
+          average_first_frost: "2023-11-15",
+          beds: [
+            {
+              id: "bed1",
+              name: "Vegetable Bed",
+              position: [1, 1],
+              dimensions: {
+                width: 3,
+                length: 5,
+                unit: "m",
+              },
+              soil_type: "Loamy soil",
+              plantings: [
+                {
+                  id: "plant1",
+                  species: "Tomato",
+                  variety: "Roma",
+                  position: [0.5, 0.5],
+                  spacing: 0.5,
+                  planted_on: "2023-05-01",
+                  expected_harvest: "2023-08-15",
+                  notes: "Needs staking",
+                },
+                {
+                  id: "plant2",
+                  species: "Tomato",
+                  variety: "Cherry",
+                  position: [1.5, 0.5],
+                  spacing: 0.4,
+                  planted_on: "2023-05-01",
+                  expected_harvest: "2023-08-10",
+                },
+                {
+                  id: "plant3",
+                  species: "Cucumber",
+                  position: [0.5, 1.5],
+                  spacing: 0.6,
+                  planted_on: "2023-05-15",
+                  expected_harvest: "2023-07-30",
+                },
+                {
+                  id: "plant4",
+                  species: "Lettuce",
+                  position: [2.5, 0.5],
+                  spacing: 0.3,
+                  planted_on: "2023-04-20",
+                  expected_harvest: "2023-06-15",
+                },
+              ],
+            },
+            {
+              id: "bed2",
+              name: "Herb Bed",
+              position: [5, 1],
+              dimensions: {
+                width: 2,
+                length: 3,
+                unit: "m",
+              },
+              soil_type: "Sandy mix",
+              plantings: [
+                {
+                  id: "plant5",
+                  species: "Basil",
+                  position: [0.5, 0.5],
+                  spacing: 0.3,
+                },
+                {
+                  id: "plant6",
+                  species: "Cilantro",
+                  position: [1.5, 0.5],
+                  spacing: 0.2,
+                },
+                {
+                  id: "plant7",
+                  species: "Rosemary",
+                  position: [1, 1.5],
+                  spacing: 0.4,
+                },
+              ],
+            },
+          ],
+          tasks: [
+            {
+              id: "task1",
+              title: "Water vegetable bed",
+              description: "Water the vegetable bed thoroughly",
+              target_date: "2023-05-22",
+              status: "pending",
+              related_bed_id: "bed1",
+            },
+            {
+              id: "task2",
+              title: "Harvest lettuce",
+              target_date: "2023-06-15",
+              status: "pending",
+              related_bed_id: "bed1",
+            },
+            {
+              id: "task3",
+              title: "Fertilize herbs",
+              description: "Apply organic fertilizer to herb bed",
+              target_date: "2023-05-25",
+              status: "pending",
+              related_bed_id: "bed2",
+            },
+            {
+              id: "task4",
+              title: "Prune tomatoes",
+              target_date: "2023-06-01",
+              status: "pending",
+              related_bed_id: "bed1",
+            },
+          ],
+        };
+
+        gardenData = exampleGarden;
+        document.getElementById("fileName").textContent = "example-garden.json";
+        document.getElementById("gardenContainer").style.display = "flex";
+        displayGarden();
+      }
+
+      // Add example button for testing
+      if (location.search.includes("example")) {
+        const exampleBtn = document.createElement("button");
+        exampleBtn.className = "btn";
+        exampleBtn.style.marginLeft = "10px";
+        exampleBtn.textContent = "Load Example Garden";
+        exampleBtn.addEventListener("click", loadExampleGarden);
+        document.getElementById("uploadBtn").parentNode.appendChild(exampleBtn);
+      }
+    </script>
+  </body>
+</html>
