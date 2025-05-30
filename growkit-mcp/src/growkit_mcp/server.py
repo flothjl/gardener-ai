@@ -1,4 +1,10 @@
+import base64
+import json
+import os
+import webbrowser
+import zlib
 from typing import List, Tuple
+from urllib.parse import quote
 
 from growkit_core.api import (
     AddBedParams,
@@ -20,7 +26,7 @@ from growkit_core.api import (
     update_bed_dimensions,
     update_garden_metadata,
 )
-from growkit_core.models import Garden, GardenTask
+from growkit_core.models import Garden
 from growkit_core.validators import GardenValidationException, validate_garden
 from mcp.server.fastmcp import FastMCP
 from mcp.shared.exceptions import McpError
@@ -325,3 +331,34 @@ def mcp_add_tasks(garden: Garden, params: AddTasksParams) -> Garden:
 )
 def get_json_schema_garden():
     return Garden.model_json_schema()
+
+
+@mcp.tool("ViewGarden")
+def view_garden(garden: Garden) -> str:
+    """
+    Open a visualization for the garden in the user's default browser.
+    Does not return the URL to the LLM, just true/false for success.
+    """
+    try:
+        URL = os.environ["VIEWER_URL"]
+    except KeyError:
+        raise McpError(
+            ErrorData(
+                message="VIEWER_URL must be set as an environment variable",
+                code=INVALID_REQUEST,
+            )
+        )
+    garden_json = json.dumps(garden.model_dump(mode="json"), separators=(",", ":"))
+    compressed = zlib.compress(garden_json.encode("utf-8"), level=9)
+    b64 = base64.urlsafe_b64encode(compressed).decode("ascii")
+    url = f"{URL}?data={quote(b64)}"
+    try:
+        webbrowser.open_new_tab(url)
+        return "URL has been successfully opened!"
+    except Exception as e:
+        raise McpError(
+            ErrorData(
+                message=f"{e}",
+                code=INVALID_REQUEST,
+            )
+        )
