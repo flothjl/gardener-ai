@@ -124,7 +124,7 @@ def move_bed(garden: Garden, params: MoveBedParams, validate: bool = True) -> Ga
 
 class AddBedParams(BaseModel):
     name: NonEmptyStr
-    position: Optional[Tuple[float, float]] = None
+    position: Optional[Tuple[float, float]] = (0, 0)
     width: NonZeroPositiveFloat
     length: NonZeroPositiveFloat
     depth: Optional[NonZeroPositiveFloat] = None
