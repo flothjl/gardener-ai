@@ -66,7 +66,9 @@ class Bed(BaseModel):
 
 
 class AgentCommentary(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    comment: str
     related_planting_id: Optional[str] = None
     related_bed_id: Optional[str] = None
 
