@@ -65,6 +65,12 @@ class Bed(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
+class AgentCommentary(BaseModel):
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    related_planting_id: Optional[str] = None
+    related_bed_id: Optional[str] = None
+
+
 class Garden(BaseModel):
     model_config = ConfigDict(json_schema_extra={"schema_version": SCHEMA_VERSION})
     schema_version: str = SCHEMA_VERSION
@@ -76,4 +82,5 @@ class Garden(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     average_last_frost: Optional[date] = None
     average_first_frost: Optional[date] = None
+    agent_comments: List[AgentCommentary] = Field(default_factory=list)
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
